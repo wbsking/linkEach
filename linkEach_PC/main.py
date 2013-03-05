@@ -12,12 +12,10 @@ from services import PlatformServices
 class Server(object):
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.br_server = BroadcastServer()
-        self.br_client = BroadcastClient()
         
         self.services = PlatformServices()
         
-        self.clients = set()
+        self.conn_clients = set()
         
         self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener.settimeout(0.5)
@@ -29,7 +27,7 @@ class Server(object):
                 sock, addr = self.listener.accept()
             except socket.timeout:
                 pass
-            self.clients.add(sock)
+            self.conn_clients.add(sock)
             self.accept_method(sock)
             
     def _accept_method(self, sock):
@@ -59,7 +57,29 @@ class Server(object):
     def _send_reply(self, sock, msg):
         sock.send(consts.REPLYNAME_MSG + msg)
 
+class Client(object):
+    def __init__(self):
+        self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    
+    def connect(self, server_ip):
+        self.conn.connect(server_ip)
+        
+    def send_msg(self, msg):
+        self.conn.send(msg)
+    
+    def recv_msg(self):
+        return self.conn.recv(consts.MAX_RECVSIZE)
+        
+class linkEach(object):
+    def __init__(self):
+        self.br_client = BroadcastClient()
+        self.br_server = BroadcastServer()
+        
+        self.local_client = set()
+        
+    def run(self):
+        self.br_server.run()
+        self.br_client.run()
                 
 if __name__ == '__main__':
-    server = BroadcastServer()
-    server.get_broadcast_client()
+    pass
