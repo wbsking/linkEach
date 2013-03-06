@@ -22,6 +22,10 @@ class Server(object):
         self.listener.bind(('', consts.SERVER_PORT))
         
     def run(self):
+        thd = threading.Thread(target=self._run)
+        thd.start()
+        
+    def _run(self):
         while 1:
             try:
                 sock, addr = self.listener.accept()
@@ -74,12 +78,19 @@ class linkEach(object):
     def __init__(self):
         self.br_client = BroadcastClient()
         self.br_server = BroadcastServer()
-        
+        self.server = Server()
         self.local_client = set()
         
     def run(self):
         self.br_server.run()
         self.br_client.run()
-                
+        self.server.run()
+        
+    def _check_new_clients(self):
+        pass
+    
+        
+          
 if __name__ == '__main__':
-    pass
+    link = linkEach()
+    link.run()

@@ -26,7 +26,7 @@ class BroadcastClient(object):
                 self.logger.debug("Send one broadcast packet")
                 self.socket.sendto(consts.BROADCAST_MSG, 
                                (consts.BROADCAST_IP, consts.BROADCAST_PORT))
-                time.sleep(60)
+                time.sleep(5)
         except Exception, ex:
             self.logger.error('%s' % ex)
         finally:
