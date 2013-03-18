@@ -26,8 +26,6 @@ class mainWindow(QtGui.QWidget):
         
         self.create_refresh_wdiget()
         self.setStyleSheet("background-color:#00ff00")
-        self.add_cast_label('test1')
-#         self.add_cast_label('test2')
     
     def set_center(self):
         screen = QtGui.QDesktopWidget().screenGeometry()
@@ -35,8 +33,7 @@ class mainWindow(QtGui.QWidget):
         self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
 
     
-    def add_cast_label(self, name='test2'):
-        print 11111111111111111111111111111
+    def add_cast_label(self, name):
         label = QtGui.QLabel(name, self)
         label.setFrameShape(QtGui.QFrame.StyledPanel)
         label.setStyleSheet("background-color:rgb(200, 200, 200);"
@@ -46,18 +43,35 @@ class mainWindow(QtGui.QWidget):
         self.ani.setDuration(500)
         self.ani.setStartValue(QtCore.QRect(0, 400, 300, 50))
         self.ani.setEndValue(QtCore.QRect(0, 50*len(self.cast_labels), 300, 50))
-#         label.setGeometry(0, 50*len(self.cast_labels), 300, 50)
         self.cast_labels.append(label)
         self.ani.start()
         
         
     def create_refresh_wdiget(self):
-        self.refresh_label = QtGui.QLabel('Refresh', self)
-        self.refresh_label.setStyleSheet("background-color:#0000ff")
-        self.refresh_label.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
+        self.refresh_label = clickedLabel('Scan', self)
         self.refresh_label.setGeometry(0, 350, 300, 50)
-        self.refresh_label.connect(self, QtCore.SIGNAL('clicked'), self.add_cast_label)
-          
+    
+
+class clickedLabel(QtGui.QLabel):
+    def __init__(self, name, parent):
+        super(clickedLabel, self).__init__(name, parent)
+        
+        self.setStyleSheet("background-color:rgb(150, 150, 150)")
+        self.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
+        
+    def mouseMoveEvent(self, event):
+        pass
+        
+    def mousePressEvent(self, event):
+        pass
+    
+    def mouseReleaseEvent(self, event):
+        pass
+    
+    
+        
+
+    
 if __name__ == '__main__':
     import sys
     app = QtGui.QApplication(sys.argv)

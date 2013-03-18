@@ -26,7 +26,7 @@ class BroadcastClient(object):
         try:
             while 1:
                 self.logger.debug("Send one broadcast packet")
-                self.socket.sendto(consts.BROADCAST_MSG, 
+                self.socket.sendto(consts.BROADCAST_MSG + PlatformServices().get_local_name(), 
                                (consts.BROADCAST_IP, consts.BROADCAST_PORT))
                 time.sleep(5)
         except Exception, ex:
@@ -59,8 +59,9 @@ class BroadcastServer(object):
         while not self.stop_flag:
             try:
                 msg, addr = self.socket.recvfrom(consts.MAX_RECVSIZE)
-                if msg == consts.BROADCAST_MSG:
+                if msg[:2] == consts.BROADCAST_MSG:
                     self._broadcast_clients[addr[0]] = 0
+                    self._broadcast_clients['name'] = msg[2:]
                     for ip_addr, count in self._broadcast_clients.items():
                         if count == 4:    
                             self._broadcast_clients.pop(ip_addr)
@@ -115,15 +116,16 @@ class Server(object):
             self._dispatch_request(sock, data)
     
     def _dispatch_request(self, sock, data):
-        if data == consts.GETNAME_MSG:
+        msg = data[:2]
+        if msg == consts.GETNAME_MSG:
             name = self.services.get_local_name()
             self._send_reply(sock, name)
-        if data == consts.SHUTDOWN_MSG:
+        if msg == consts.SHUTDOWN_MSG:
             self.services.shutdown()
-        if data == consts.REBOOT_MSG:
+        if msg == consts.REBOOT_MSG:
             self.services.reboot()
-        if data.startswith(consts.REPLYNAME_MSG):
-            print data.split(consts.REPLYNAME_MSG)[1]
+        if msg == consts.REPLYNAME_MSG:
+            print data[2:]
             
     def _send_reply(self, sock, msg):
         sock.send(consts.REPLYNAME_MSG + msg)
