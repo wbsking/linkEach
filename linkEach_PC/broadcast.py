@@ -13,18 +13,22 @@ class BroadcastClient(object):
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.socket = None
-    
+        self.stop_flag = False
+        
     def run(self):
         br_thd = threading.Thread(target=self.broadcast)
         br_thd.setDaemon(True)
         br_thd.start()
+    
+    def stop_broadcast(self):
+        self.stop_flag = True
     
     def broadcast(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.socket.settimeout(0.5)
         try:
-            while 1:
+            while not self.stop_flag:
                 self.logger.debug("Send one broadcast packet")
                 self.socket.sendto(consts.BROADCAST_MSG + PlatformServices().get_local_name(), 
                                (consts.BROADCAST_IP, consts.BROADCAST_PORT))
@@ -37,6 +41,7 @@ class BroadcastClient(object):
             
 class BroadcastServer(object):
     def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self._broadcast_clients = {}
         self.socket = None
         self.stop_flag = False
@@ -56,30 +61,39 @@ class BroadcastServer(object):
     def _get_broadcast_client(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind(('', consts.BROADCAST_PORT))
-        while not self.stop_flag:
-            try:
+        try:
+            while not self.stop_flag:
                 msg, addr = self.socket.recvfrom(consts.MAX_RECVSIZE)
                 if msg[:2] == consts.BROADCAST_MSG:
-                    self._broadcast_clients[addr[0]] = 0
-                    self._broadcast_clients['name'] = msg[2:]
-                    for ip_addr, count in self._broadcast_clients.items():
-                        if count == 4:    
-                            self._broadcast_clients.pop(ip_addr)
-                        self._broadcast_clients[ip_addr] += 1
-                        
-                time.sleep(60)
-            except Exception ,ex:
-                self.logger.error('%s' % ex)
-                raise
+                    ip = addr[0]
+#                     if ip == PlatformServices().get_local_ip():
+#                         time.sleep(3)
+#                         continue
+                    
+                    if ip in self._broadcast_clients:
+                        self._broadcast_clients[ip]['count'] = -1
+                    else:
+                        self._broadcast_clients[ip] = {}
+                        self._broadcast_clients[ip]['count'] = -1
+                        self._broadcast_clients[ip]['name'] = msg[2:]
+                    for ip, info_dict in self._broadcast_clients.iteritems():
+                        info_dict['count'] += 1
+                        if info_dict['count'] == 4:
+                            self._broadcast_clients.pop(ip)
+                    
+                time.sleep(3)
+                
+        except Exception ,ex:
+            self.logger.error('%s' % ex)
             
-            finally:
-                self.socket.close()
-                self.socket = None
-
+        finally:
+            self.socket.close()
+            self.socket = None
 
 class Server(object):
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.stop_flag = False
         
         self.services = PlatformServices()
         
@@ -88,13 +102,16 @@ class Server(object):
         self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener.settimeout(2)
         self.listener.bind(('', consts.SERVER_PORT))
-        
+    
+    def stop(self):
+        self.stop_flag = True
+    
     def run(self):
         thd = threading.Thread(target=self._run)
         thd.start()
         
     def _run(self):
-        while 1:
+        while not self.stop_flag:
             try:
                 sock, addr = self.listener.accept()
             except socket.timeout:

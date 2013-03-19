@@ -5,9 +5,6 @@ import socket
 import threading
 import time
 
-import logging
-logging.basicConfig()
-
 import consts
 from broadcast import *
 
@@ -17,22 +14,38 @@ class mainWindow(QtGui.QWidget):
     def __init__(self, parent=None):
         super(mainWindow, self).__init__(parent)
         self.cast_labels = []
+        self.br_client = BroadcastClient()
+        self.br_server = BroadcastServer()
+        self.link_server = Server()
+        self.clients = []
+        self.stop_check_flag = False
+        
         self.init()
         
     def init(self):
         self.setFixedSize(300, 400)
         self.setWindowTitle('linkEach')
         self.set_center()
-        
         self.create_refresh_wdiget()
-#         self.setStyleSheet("background-color:rgb(220, 220, 220)")
+        
+        self.run()
     
+    #TODO:
+    def check_broadcast_client(self):
+        while not self.stop_check_flag:
+            clients = self.br_server.broadcast_clients
+            for ip, info_dict in clients.items():
+                if ip not in self.clients:
+                    self.add_cast_label(info_dict['name'])
+            
+        
+        
     def set_center(self):
         screen = QtGui.QDesktopWidget().screenGeometry()
         size = self.geometry()
         self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
 
-    def add_cast_label(self, name='test1'):
+    def add_cast_label(self, name):
         cast_abel_style_sheet = "background-color:rgb(220, 220, 220);"
         label = clickedLabel(name, self, cast_abel_style_sheet)
         label.setFrameShape(QtGui.QFrame.StyledPanel)
@@ -50,15 +63,23 @@ class mainWindow(QtGui.QWidget):
         self.cast_labels.append(label)
         
     def create_refresh_wdiget(self):
-        self.refresh_label = clickedLabel('Scan', self)
+        self.refresh_label = clickedLabel('SCAN', self)
         self.refresh_label.setGeometry(0, 350, 300, 50)
-        self.connect(self.refresh_label, QtCore.SIGNAL('clicked'), self.add_cast_label)
-
+        self.connect(self.refresh_label, QtCore.SIGNAL('clicked'), self.rescan)
     
     def rescan(self):
         pass
     
-
+    def run(self):
+        self.br_client.run()
+        self.br_server.run()
+        self.link_server.run()
+    
+    def closeEvent(self, event):
+        self.br_client.stop_broadcast()
+        self.br_server.stop()
+        self.link_server.stop()
+    
 class clickedLabel(QtGui.QLabel):
     def __init__(self, name, parent, default_style_sheet=None):
         super(clickedLabel, self).__init__(name, parent)
@@ -81,10 +102,6 @@ class clickedLabel(QtGui.QLabel):
         
     def mouseReleaseEvent(self, event):
         self.setStyleSheet(self.default_style_sheet)
-    
-    
-        
-
     
 if __name__ == '__main__':
     import sys
