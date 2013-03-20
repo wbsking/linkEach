@@ -10,6 +10,8 @@ from broadcast import *
 
 from PyQt4 import QtCore, QtGui
 
+
+
 class mainWindow(QtGui.QWidget):
     def __init__(self, parent=None):
         super(mainWindow, self).__init__(parent)
@@ -30,16 +32,17 @@ class mainWindow(QtGui.QWidget):
         
         self.run()
     
-    #TODO:
-    def check_broadcast_client(self):
+    def get_broadcast_client(self):
+        thd = threading.Thread(target=self._get_broadcast_client)
+        thd.setDaemon(True)
+        thd.start()
+    
+    def _get_broadcast_client(self):
         while not self.stop_check_flag:
             clients = self.br_server.broadcast_clients
-            for ip, info_dict in clients.items():
-                if ip not in self.clients:
-                    self.add_cast_label(info_dict['name'])
-            
-        
-        
+            print clients
+            time.sleep(5)
+    
     def set_center(self):
         screen = QtGui.QDesktopWidget().screenGeometry()
         size = self.geometry()
@@ -74,7 +77,8 @@ class mainWindow(QtGui.QWidget):
         self.br_client.run()
         self.br_server.run()
         self.link_server.run()
-    
+        self.get_broadcast_client()
+        
     def closeEvent(self, event):
         self.br_client.stop_broadcast()
         self.br_server.stop()
