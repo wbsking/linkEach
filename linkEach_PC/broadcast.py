@@ -66,9 +66,9 @@ class BroadcastServer(object):
                 msg, addr = self.socket.recvfrom(consts.MAX_RECVSIZE)
                 if msg[:2] == consts.BROADCAST_MSG:
                     ip = addr[0]
-#                     if ip == PlatformServices().get_local_ip():
-#                         time.sleep(3)
-#                         continue
+                    if ip == PlatformServices().get_local_ip():
+                        time.sleep(3)
+                        continue
                     
                     if ip in self._broadcast_clients:
                         self._broadcast_clients[ip]['count'] = -1
@@ -102,6 +102,7 @@ class Server(object):
         self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener.settimeout(2)
         self.listener.bind(('', consts.SERVER_PORT))
+        self.listener.listen(5)
     
     def stop(self):
         self.stop_flag = True
@@ -119,7 +120,7 @@ class Server(object):
             self.conn_clients.add(sock)
             self.accept_method(sock)
             
-    def _accept_method(self, sock):
+    def accept_method(self, sock):
         thd = threading.Thread(target=self._serve_client, args=(sock,))
         thd.setDaemon(True)
         thd.start()
@@ -152,7 +153,10 @@ class Client(object):
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
     def connect(self, server_ip):
-        self.conn.connect(server_ip)
+        self.conn.connect((server_ip, consts.SERVER_PORT))
+    
+    def close(self):
+        self.conn.close()
         
     def send_msg(self, msg):
         self.conn.send(msg)
@@ -161,8 +165,8 @@ class Client(object):
         return self.conn.recv(consts.MAX_RECVSIZE)
     
 if __name__ == '__main__':
-    client = BroadcastClient()
-    client.broadcast()
+    server = Server()
+    server.run()
     
     
     

@@ -16,11 +16,11 @@ class PlatformServices(object):
     
     def shutdown(self): 
         if sys.platform.startswith('win'): 
-            os.system('shutdown /s')
+            os.system('shutdown /s /f')
     
     def reboot(self):
         if sys.platform.startswith('win'):
-            os.system('shutdown /r')
+            os.system('shutdown /r /f')
     
 if __name__ == '__main__':
     ser = PlatformServices()

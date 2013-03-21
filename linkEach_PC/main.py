@@ -36,6 +36,7 @@ class mainWindow(QtGui.QWidget):
         self.connect(self.check_thread, QtCore.SIGNAL('newClient'), self.check_new_client)
         
         self.clients = []
+        self.conn_clients = []
         self.cast_labels = {}
 
         self.init()
@@ -49,7 +50,6 @@ class mainWindow(QtGui.QWidget):
         self.run()
         
     def check_new_client(self, clients):
-        print self.clients
         for ip, info_dict in clients.items():
             for client in self.clients:
                 if ip in client:
@@ -90,7 +90,12 @@ class mainWindow(QtGui.QWidget):
         pass
 
     def connect_remote_server(self, ip):
-        print ip
+        try:
+            conn_client = Client()
+            conn_client.connect(ip)
+        except Exception, ex:
+            print ex
+        
         
     
     def run(self):
