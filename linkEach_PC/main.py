@@ -10,18 +10,34 @@ from broadcast import *
 
 from PyQt4 import QtCore, QtGui
 
-
-
+class CheckBroadcast(QtCore.QThread):
+    def __init__(self, br_server, parent=None):
+        super(CheckBroadcast, self).__init__(parent)
+        self.stop_flag = False
+        self.br_server = br_server
+        
+    def run(self):
+        while not self.stop_flag:
+            clients = self.br_server.broadcast_clients
+            self.emit(QtCore.SIGNAL('newClient'), clients)
+            time.sleep(5)
+    
+    def stop(self):
+        pass
+    
 class mainWindow(QtGui.QWidget):
     def __init__(self, parent=None):
         super(mainWindow, self).__init__(parent)
-        self.cast_labels = []
         self.br_client = BroadcastClient()
         self.br_server = BroadcastServer()
         self.link_server = Server()
-        self.clients = []
-        self.stop_check_flag = False
+        self.check_thread = CheckBroadcast(self.br_server)
         
+        self.connect(self.check_thread, QtCore.SIGNAL('newClient'), self.check_new_client)
+        
+        self.clients = []
+        self.cast_labels = {}
+
         self.init()
         
     def init(self):
@@ -31,17 +47,20 @@ class mainWindow(QtGui.QWidget):
         self.create_refresh_wdiget()
         
         self.run()
+        
+    def check_new_client(self, clients):
+        print self.clients
+        for ip, info_dict in clients.items():
+            for client in self.clients:
+                if ip in client:
+                    break
+            else:
+                self.clients.append({ip:info_dict})
+                self.add_cast_label(ip)
     
-    def get_broadcast_client(self):
-        thd = threading.Thread(target=self._get_broadcast_client)
-        thd.setDaemon(True)
-        thd.start()
-    
-    def _get_broadcast_client(self):
-        while not self.stop_check_flag:
-            clients = self.br_server.broadcast_clients
-            print clients
-            time.sleep(5)
+    #TODO:
+    def remove_cast_label(self):
+        pass
     
     def set_center(self):
         screen = QtGui.QDesktopWidget().screenGeometry()
@@ -50,11 +69,8 @@ class mainWindow(QtGui.QWidget):
 
     def add_cast_label(self, name):
         cast_abel_style_sheet = "background-color:rgb(220, 220, 220);"
-        label = clickedLabel(name, self, cast_abel_style_sheet)
-        label.setFrameShape(QtGui.QFrame.StyledPanel)
-        label.setGeometry(QtCore.QRect(0, 0, 300, 50))
-        label.setStyleSheet("border:1px solid gray;")
-        label.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
+        label = castLabel(name, self, cast_abel_style_sheet)
+        self.connect(label, QtCore.SIGNAL('connect'), self.connect_remote_server)
         label.show()
         
         self.ani = QtCore.QPropertyAnimation(label, 'geometry')
@@ -63,7 +79,7 @@ class mainWindow(QtGui.QWidget):
         self.ani.setEndValue(QtCore.QRect(0, 50*len(self.cast_labels), 300, 50))
         self.ani.setEasingCurve(QtCore.QEasingCurve.InOutCubic)
         self.ani.start()
-        self.cast_labels.append(label)
+        self.cast_labels[name] = label
         
     def create_refresh_wdiget(self):
         self.refresh_label = clickedLabel('SCAN', self)
@@ -72,12 +88,16 @@ class mainWindow(QtGui.QWidget):
     
     def rescan(self):
         pass
+
+    def connect_remote_server(self, ip):
+        print ip
+        
     
     def run(self):
         self.br_client.run()
         self.br_server.run()
         self.link_server.run()
-        self.get_broadcast_client()
+        self.check_thread.start()
         
     def closeEvent(self, event):
         self.br_client.stop_broadcast()
@@ -106,6 +126,24 @@ class clickedLabel(QtGui.QLabel):
         
     def mouseReleaseEvent(self, event):
         self.setStyleSheet(self.default_style_sheet)
+
+class castLabel(clickedLabel):
+    def __init__(self, name, parent, default_style_sheet=None):
+        super(castLabel, self).__init__(name, parent)
+        
+        self.name = name
+        if default_style_sheet is None:
+            default_style_sheet = "background-color:rgb(180, 180, 180);"
+        
+        self.default_style_sheet = default_style_sheet
+        self.setStyleSheet(self.default_style_sheet)
+        self.setFrameShape(QtGui.QFrame.StyledPanel)
+        self.setStyleSheet(("border:1px solid gray;"))
+    
+    def mousePressEvent(self, event):
+        self.setStyleSheet("background-color:rgb(200, 200, 200)")
+        self.emit(QtCore.SIGNAL('connect'), self.name)
+    
     
 if __name__ == '__main__':
     import sys
