@@ -66,9 +66,9 @@ class BroadcastServer(object):
                 msg, addr = self.socket.recvfrom(consts.MAX_RECVSIZE)
                 if msg[:2] == consts.BROADCAST_MSG:
                     ip = addr[0]
-                    if ip == PlatformServices().get_local_ip():
-                        time.sleep(3)
-                        continue
+#                     if ip == PlatformServices().get_local_ip():
+#                         time.sleep(3)
+#                         continue
                     
                     if ip in self._broadcast_clients:
                         self._broadcast_clients[ip]['count'] = -1
@@ -129,8 +129,9 @@ class Server(object):
         while 1:
             try:
                 data = sock.recv(consts.MAX_RECVSIZE)
-            except socket.timeout:
-                pass
+            except Exception, ex:
+                time.sleep(3)
+                continue
             self._dispatch_request(sock, data)
     
     def _dispatch_request(self, sock, data):
