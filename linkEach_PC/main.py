@@ -81,17 +81,47 @@ class mainWindow(QtGui.QWidget):
         self.run()
         
     def check_new_server(self, remote_servers):
+        print remote_servers
         for ip, info_dict in remote_servers.items():
             for server in self.remote_server:
                 if ip in server:
                     break
             else:
                 self.add_cast_label(ip, info_dict)
-    
+        
+        for item in self.remote_server:
+            for ip in item:
+                if not remote_servers.get(ip):
+                    self.remove_cast_label(ip)
+        
     #TODO:
     def remove_cast_label(self, ip):
-        pass
-    
+        self.group_ani = QtCore.QParallelAnimationGroup()
+        
+        index = self.remote_server.get_index(ip)
+        self.remote_server[ip]['label'].hide()
+        if self.remote_server[ip].get('operation_label'):
+            self.remote_server[ip]['operation_label'].hide()
+            
+        for item in self.remote_server[index+1:]:
+            for ip in item:
+                top = item[ip]['label'].geometry().top()
+                ani = QtCore.QPropertyAnimation(item[ip]['label'], 'geometry')
+                ani.setStartValue(QtCore.QRect(0, top, 300, 50))
+                ani.setEndValue(QtCore.QRect(0, top-50, 300, 50))
+                self.group_ani.addAnimation(ani)
+                
+                if self.remote_server[ip].get('show_flag'):
+                    ani = QtCore.QPropertyAnimation(self.remote_server[ip]['operation_label'], 'geometry')
+                    tmp_top = self.remote_server[ip]['operation_label'].geometry().top()
+                    ani.setDuration(300)
+                    ani.setStartValue(QtCore.QRect(0, tmp_top, 300, 50))
+                    ani.setEndValue(QtCore.QRect(0, tmp_top-50, 300, 50))
+                    self.group_ani.addAnimation(ani)
+        
+        self.group_ani.start()
+        del self.remote_server[index]
+        
     def set_center(self):
         screen = QtGui.QDesktopWidget().screenGeometry()
         size = self.geometry()
