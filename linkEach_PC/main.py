@@ -43,9 +43,6 @@ class RemoteServerList(list):
             if key in item:
                 return index
             
-            
-            
-
 class CheckBroadcast(QtCore.QThread):
     def __init__(self, br_server, parent=None):
         super(CheckBroadcast, self).__init__(parent)
@@ -111,9 +108,11 @@ class mainWindow(QtGui.QWidget):
         if not self.remote_server:
             top = 0
         elif self.remote_server[-1].get('show_flag'):
-            top = self.remote_server[-1]['operation_label'].geometry().top() + self.remote_server[-1]['operation_label'].geometry().height()
+            top = self.remote_server[-1]['operation_label'].geometry().top() + \
+                   self.remote_server[-1]['operation_label'].geometry().height()
         else:
-            top = self.remote_server[-1]['label'].geometry().top() + self.remote_server[-1]['label'].geometry().height() 
+            top = self.remote_server[-1]['label'].geometry().top() + \
+                        self.remote_server[-1]['label'].geometry().height() 
         self.ani.setStartValue(QtCore.QRect(300, top, 300, 50))
         self.ani.setEndValue(QtCore.QRect(0, top, 300, 50))
         self.ani.setEasingCurve(QtCore.QEasingCurve.InOutCubic)
@@ -136,7 +135,14 @@ class mainWindow(QtGui.QWidget):
                 client = Client()
                 client.connect(remote_ip)
                 self.remote_server[remote_ip]['client'] = client
+                
                 operation_label = operationLabel(self)
+                
+                shutdown_func = lambda: self.remote_server[remote_ip]['client'].send_msg(consts.SHUTDOWN_MSG)
+                reboot_func = lambda:self.remote_server[remote_ip]['client'].send_msg(consts.REBOOT_MSG)
+                self.connect(operation_label.shutdown_label, QtCore.SIGNAL('clicked()'), shutdown_func)
+                self.connect(operation_label.reboot_label, QtCore.SIGNAL('clicked()'), reboot_func)
+                
                 self.remote_server[remote_ip]['show_flag'] = False
                 self.remote_server[remote_ip]['operation_label'] = operation_label
             else:
@@ -214,8 +220,6 @@ class mainWindow(QtGui.QWidget):
          
         self.group_ani.start()
         
-     
-    
     def run(self):
         self.br_client.run()
         self.br_server.run()
@@ -245,7 +249,7 @@ class clickedLabel(QtGui.QLabel):
     
     def mousePressEvent(self, event):
         self.setStyleSheet("background-color:rgb(200, 200, 200);")
-        self.emit(QtCore.SIGNAL('clicked'))
+        self.emit(QtCore.SIGNAL('clicked()'))
         
     def mouseReleaseEvent(self, event):
         self.setStyleSheet(self.default_style_sheet)
@@ -285,6 +289,8 @@ class operationLabel(QtGui.QLabel):
         h_layout.addWidget(self.shutdown_label)
         h_layout.addWidget(self.reboot_label)
         self.setLayout(h_layout)
+        
+        
         
 
 if __name__ == '__main__':
