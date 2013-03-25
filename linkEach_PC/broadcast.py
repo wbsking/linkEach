@@ -129,7 +129,7 @@ class Server(object):
         while 1:
             try:
                 data = sock.recv(consts.MAX_RECVSIZE)
-            except Exception, ex:
+            except:
                 time.sleep(3)
                 continue
             self._dispatch_request(sock, data)

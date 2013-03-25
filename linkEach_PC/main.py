@@ -1,11 +1,8 @@
 #!/usr/bin/python
 #-*- coding:utf-8 -*-
 
-import socket
-import threading
-import time
+import sys
 
-import consts
 from broadcast import *
 
 from PyQt4 import QtCore, QtGui
@@ -75,13 +72,17 @@ class mainWindow(QtGui.QWidget):
     def init(self):
         self.setFixedSize(300, 400)
         self.setWindowTitle('linkEach')
+        self.setWindowIcon(QtGui.QIcon('icon/medium.ico'))
+        self.setStyleSheet("background-color:#D8D3B5")
         self.set_center()
         self.create_refresh_wdiget()
+        
+        self.tray_icon = TrayIcon(self)
+        self.tray_icon.show()
         
         self.run()
         
     def check_new_server(self, remote_servers):
-        print remote_servers
         for ip, info_dict in remote_servers.items():
             for server in self.remote_server:
                 if ip in server:
@@ -128,8 +129,7 @@ class mainWindow(QtGui.QWidget):
         self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
 
     def add_cast_label(self, remote_ip, info_dict):
-        cast_abel_style_sheet = "background-color:rgb(220, 220, 220);"
-        label = castLabel(remote_ip, self, cast_abel_style_sheet)
+        label = castLabel(remote_ip, self)
         self.connect(label, QtCore.SIGNAL('connect'), self.connect_remote_server)
         label.show()
         
@@ -257,6 +257,10 @@ class mainWindow(QtGui.QWidget):
         self.check_thread.start()
         
     def closeEvent(self, event):
+        self.hide()
+        event.ignore()
+        
+    def stop(self):
         self.br_client.stop_broadcast()
         self.br_server.stop()
         self.link_server.stop()
@@ -285,14 +289,13 @@ class clickedLabel(QtGui.QLabel):
         self.setStyleSheet(self.default_style_sheet)
 
 class castLabel(clickedLabel):
-    def __init__(self, name, parent, default_style_sheet=None):
+    def __init__(self, name, parent, style_sheet=None):
         super(castLabel, self).__init__(name, parent)
         
         self.name = name
-        if default_style_sheet is None:
-            default_style_sheet = "background-color:rgb(180, 180, 180);"
-        
-        self.default_style_sheet = default_style_sheet
+        if not style_sheet:
+            style_sheet = "background-color:rgb(180, 180, 180);"
+        self.default_style_sheet = style_sheet
         self.setStyleSheet(self.default_style_sheet)
         self.setFrameShape(QtGui.QFrame.StyledPanel)
         self.setStyleSheet("border:1px solid gray;")
@@ -320,11 +323,45 @@ class operationLabel(QtGui.QLabel):
         h_layout.addWidget(self.reboot_label)
         self.setLayout(h_layout)
         
+class TrayIcon(QtGui.QSystemTrayIcon):
+    def __init__(self, frame):
+        super(TrayIcon, self).__init__()
         
+        self.setIcon(QtGui.QIcon('icon/medium.ico'))
+        self.frame = frame
         
+        self.tray_menu = QtGui.QMenu()
+        exit_action = QtGui.QAction('Exit', self)
+        show_action = QtGui.QAction('Show', self)
+        self.tray_menu.addAction(show_action)
+        self.tray_menu.addAction(exit_action)
+        
+        self.setContextMenu(self.tray_menu)
+        self.activated.connect(self.onTrayClick)
+        
+        self.connect(exit_action, QtCore.SIGNAL('triggered()'), self.exit)
+        self.connect(show_action, QtCore.SIGNAL('triggered()'), self.show_frame)
+        
+    def exit(self):
+        self.frame.stop()
+        sys.exit(0)
+        
+    def show_frame(self):
+        if self.frame.isHidden():
+            self.frame.show()
+            self.frame.setWindowState(QtCore.Qt.WindowActive)
+        self.frame.raise_()
+    
+    def onTrayClick(self, event):
+        if event in (QtGui.QSystemTrayIcon.DoubleClick,):
+            self.show_frame()
+        
+        elif event is QtGui.QSystemTrayIcon.Trigger:
+            self.tray_menu.show()
+                
+    
 
 if __name__ == '__main__':
-    import sys
     app = QtGui.QApplication(sys.argv)
     wind = mainWindow()
     wind.show()
