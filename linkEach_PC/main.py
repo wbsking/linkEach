@@ -53,7 +53,7 @@ class CheckBroadcast(QtCore.QThread):
             time.sleep(5)
     
     def stop(self):
-        pass
+        self.stop_flag = True
 
 class mainWindow(QtGui.QWidget):
     def __init__(self, parent=None):
@@ -95,7 +95,6 @@ class mainWindow(QtGui.QWidget):
                 if not remote_servers.get(ip):
                     self.remove_cast_label(ip)
         
-    #TODO:
     def remove_cast_label(self, ip):
         self.group_ani = QtCore.QParallelAnimationGroup()
         
@@ -129,6 +128,7 @@ class mainWindow(QtGui.QWidget):
         self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
 
     def add_cast_label(self, remote_ip, info_dict):
+        info_dict = info_dict.copy()
         label = castLabel(remote_ip, self)
         self.connect(label, QtCore.SIGNAL('connect'), self.connect_remote_server)
         label.show()
