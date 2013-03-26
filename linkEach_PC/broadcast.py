@@ -136,16 +136,16 @@ class Server(object):
         msg = data[:2]
         if msg == consts.GETNAME_MSG:
             name = self.services.get_local_name()
-            self._send_reply(sock, name)
+            self.send_reply(sock, consts.REPLY_OKMSG+name)
         if msg == consts.SHUTDOWN_MSG:
+            self.send_reply(sock, consts.REPLY_OKMSG)
             self.services.shutdown()
         if msg == consts.REBOOT_MSG:
+            self.send_reply(sock, consts.REPLY_OKMSG)
             self.services.reboot()
-        if msg == consts.REPLYNAME_MSG:
-            print data[2:]
             
-    def _send_reply(self, sock, msg):
-        sock.send(consts.REPLYNAME_MSG + msg)
+    def send_reply(self, sock, msg):
+        sock.send(msg)
 
 class Client(object):
     def __init__(self):

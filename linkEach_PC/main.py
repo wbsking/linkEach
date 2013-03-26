@@ -4,6 +4,7 @@
 import sys
 
 from broadcast import *
+from Queue import Queue
 
 from PyQt4 import QtCore, QtGui
 
@@ -55,6 +56,17 @@ class CheckBroadcast(QtCore.QThread):
     def stop(self):
         self.stop_flag = True
 
+class loadingLabel(QtGui.QLabel):
+    def __init__(self, parent=None):
+        super(loadingLabel, self).__init__(parent)
+        
+        self.setFixedSize(300, 400)
+        mv = QtGui.QMovie('icon/loading.gif')
+        self.setMovie(mv)
+        mv.start()
+        self.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
+        self.setStyleSheet("background-color:rgba(200, 200, 200, 90%);")
+
 class mainWindow(QtGui.QWidget):
     def __init__(self, parent=None):
         super(mainWindow, self).__init__(parent)
@@ -66,7 +78,9 @@ class mainWindow(QtGui.QWidget):
         self.connect(self.check_thread, QtCore.SIGNAL('newClient'), self.check_new_server)
         
         self.remote_server = RemoteServerList()
-
+        
+        self.loading_flag = True
+        
         self.init()
         
     def init(self):
@@ -75,14 +89,28 @@ class mainWindow(QtGui.QWidget):
         self.setWindowIcon(QtGui.QIcon('icon/medium.ico'))
         self.setStyleSheet("background-color:#D8D3B5")
         self.set_center()
-        self.create_refresh_wdiget()
+        
+        self.loading_label = loadingLabel(self)
+        self.show_loading()
         
         self.tray_icon = TrayIcon(self)
         self.tray_icon.show()
         
         self.run()
+    
+    def show_loading(self):
+        self.loading_label.show()
+        self.loading_label.raise_()
+        
+    def hide_loading(self):
+        if not self.loading_label.isHidden():
+            self.loading_label.hide()
+            self.loading_label.lower()
+    
         
     def check_new_server(self, remote_servers):
+        if remote_servers:
+            self.hide_loading()
         for ip, info_dict in remote_servers.items():
             for server in self.remote_server:
                 if ip in server:
@@ -94,6 +122,9 @@ class mainWindow(QtGui.QWidget):
             for ip in item:
                 if not remote_servers.get(ip):
                     self.remove_cast_label(ip)
+        
+        if not self.remote_server:
+            self.show_loading()
         
     def remove_cast_label(self, ip):
         self.group_ani = QtCore.QParallelAnimationGroup()
@@ -150,14 +181,6 @@ class mainWindow(QtGui.QWidget):
         info_dict['label'] = label
         self.remote_server.add({remote_ip:info_dict})
         
-    def create_refresh_wdiget(self):
-        self.refresh_label = clickedLabel('SCAN', self)
-        self.refresh_label.setGeometry(0, 350, 300, 50)
-        self.connect(self.refresh_label, QtCore.SIGNAL('clicked'), self.rescan)
-    
-    def rescan(self):
-        pass
-    
     #TODO: connect will frozen the UI
     def connect_remote_server(self, remote_ip):
         try:
@@ -169,7 +192,7 @@ class mainWindow(QtGui.QWidget):
                 operation_label = operationLabel(self)
                 
                 shutdown_func = lambda: self.remote_server[remote_ip]['client'].send_msg(consts.SHUTDOWN_MSG)
-                reboot_func = lambda:self.remote_server[remote_ip]['client'].send_msg(consts.REBOOT_MSG)
+                reboot_func = lambda: self.remote_server[remote_ip]['client'].send_msg(consts.REBOOT_MSG)
                 self.connect(operation_label.shutdown_label, QtCore.SIGNAL('clicked()'), shutdown_func)
                 self.connect(operation_label.reboot_label, QtCore.SIGNAL('clicked()'), reboot_func)
                 
@@ -233,6 +256,8 @@ class mainWindow(QtGui.QWidget):
                 ani.setStartValue(QtCore.QRect(0, tmp_top, 300, 50))
                 ani.setEndValue(QtCore.QRect(0, tmp_top+50, 300, 50))
                 self.group_ani.addAnimation(ani)
+                self.remote_server[ip]['label'].setStyleSheet()
+                
                 if self.remote_server[ip]['show_flag']:
                     ani = QtCore.QPropertyAnimation(self.remote_server[ip]['operation_label'], 'geometry')
                     tmp_top = self.remote_server[ip]['operation_label'].geometry().top()
@@ -292,7 +317,7 @@ class castLabel(clickedLabel):
     def __init__(self, name, parent, style_sheet=None):
         super(castLabel, self).__init__(name, parent)
         
-        self.name = name
+        self.remote_ip = name
         if not style_sheet:
             style_sheet = "background-color:rgb(180, 180, 180);"
         self.default_style_sheet = style_sheet
@@ -302,7 +327,7 @@ class castLabel(clickedLabel):
     
     def mousePressEvent(self, event):
         self.setStyleSheet("background-color:rgb(200, 200, 200);")
-        self.emit(QtCore.SIGNAL('connect'), self.name)
+        self.emit(QtCore.SIGNAL('connect'), self.remote_ip)
 
 
 class operationLabel(QtGui.QLabel):
