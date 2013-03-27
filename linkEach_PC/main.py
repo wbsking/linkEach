@@ -56,6 +56,20 @@ class CheckBroadcast(QtCore.QThread):
     def stop(self):
         self.stop_flag = True
 
+
+class clientThd(QtCore.QThread):
+    def __init__(self, sock, remote_ip, parent=None):
+        super(clientThd, self).__init__(parent)
+        self.sock = sock
+        self.remote_ip = remote_ip
+        
+    def run(self):
+        try:
+            self.sock.connect(self.remote_ip)
+            self.emit(QtCore.SIGNAL('connected'),  self.sock, self.remote_ip)
+        except Exception, ex:
+            self.emit(QtCore.SIGNAL('connected'), ex)
+
 class loadingLabel(QtGui.QLabel):
     def __init__(self, parent=None):
         super(loadingLabel, self).__init__(parent)
@@ -66,51 +80,162 @@ class loadingLabel(QtGui.QLabel):
         mv.start()
         self.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
         self.setStyleSheet("background-color:rgba(200, 200, 200, 90%);")
+    
+    def label_show(self):
+        self.show()
+        self.raise_()
+    
+    def label_hide(self):
+        if not self.isHidden():
+            self.hide()
+            self.lower()
 
+class clickedLabel(QtGui.QLabel):
+    def __init__(self, name, parent, default_style_sheet=None):
+        super(clickedLabel, self).__init__(name, parent)
+        if default_style_sheet is None:
+            default_style_sheet = "background-color:rgb(100, 100, 100);"
+            
+        self.default_style_sheet = default_style_sheet
+        self.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
+        
+    def enterEvent(self, event):
+        self.setStyleSheet("background-color:rgb(120, 120, 120);")
+    
+    def leaveEvent(self, event):
+        self.setStyleSheet(self.default_style_sheet)
+    
+    def mousePressEvent(self, event):
+        self.setStyleSheet("background-color:rgb(200, 200, 200);")
+        self.emit(QtCore.SIGNAL('clicked()'))
+        
+    def mouseReleaseEvent(self, event):
+        self.setStyleSheet(self.default_style_sheet)
+
+class castLabel(clickedLabel):
+    def __init__(self, name, parent, style_sheet=None):
+        super(castLabel, self).__init__(name, parent)
+        
+        self.remote_ip = name
+        if not style_sheet:
+            style_sheet = "background-color:rgb(180, 180, 180);"
+        self.default_style_sheet = style_sheet
+        self.setFrameShape(QtGui.QFrame.StyledPanel)
+    
+    def mousePressEvent(self, event):
+        self.emit(QtCore.SIGNAL('cast_connect'), self.remote_ip)
+
+
+class operationLabel(QtGui.QLabel):
+    def __init__(self, parent=None):
+        super(operationLabel, self).__init__(parent)
+        
+        h_layout = QtGui.QHBoxLayout()
+        default_style_sheet = "background-color:rgb(170, 170, 170);"\
+                              "border-radius:5px;border:1px solid gray"
+                              
+        self.shutdown_label = radiusLabel('Shutdown', self, default_style_sheet)
+        self.shutdown_label.setStyleSheet(default_style_sheet)
+        self.reboot_label = radiusLabel('Reboot', self, default_style_sheet)
+        self.reboot_label.setStyleSheet(default_style_sheet)
+        
+        h_layout.addWidget(self.shutdown_label)
+        h_layout.addWidget(self.reboot_label)
+        self.setLayout(h_layout)
+
+class radiusLabel(QtGui.QLabel):
+    def __init__(self, name, style_sheet=None, parent=None):
+        super(radiusLabel, self).__init__(parent)
+    
+        if style_sheet is None:
+            style_sheet = " background-color:rgb(170, 170, 170);"\
+                          "border-radius:5px;border:1px solid gray"
+        self.name = name
+        self.setText(self.name)
+        self.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
+        self.default_style_sheet = style_sheet
+    
+    def enterEvent(self, event):
+        self.setStyleSheet("background-color:rgb(120, 120, 120);"
+                           "border-radius:5px;border:1px solid gray")
+    
+    def leaveEvent(self, event):
+        self.setStyleSheet(self.default_style_sheet)
+    
+    def mousePressEvent(self, event):
+        self.setStyleSheet("background-color:rgb(200, 200, 200);"
+                           "border-radius:5px;border:1px solid gray")
+        self.emit(QtCore.SIGNAL('send_msg'), self.name)
+        
+    def mouseReleaseEvent(self, event):
+        self.setStyleSheet(self.default_style_sheet)
+
+class TrayIcon(QtGui.QSystemTrayIcon):
+    def __init__(self, frame):
+        super(TrayIcon, self).__init__()
+        
+        self.setIcon(QtGui.QIcon('icon/medium.ico'))
+        self.frame = frame
+        
+        self.tray_menu = QtGui.QMenu()
+        exit_action = QtGui.QAction('Exit', self)
+        show_action = QtGui.QAction('Show', self)
+        self.tray_menu.addAction(show_action)
+        self.tray_menu.addAction(exit_action)
+        
+        self.setContextMenu(self.tray_menu)
+        self.activated.connect(self.onTrayClick)
+        
+        self.connect(exit_action, QtCore.SIGNAL('triggered()'), self.exit)
+        self.connect(show_action, QtCore.SIGNAL('triggered()'), self.show_frame)
+        
+    def exit(self):
+        self.frame.stop()
+        sys.exit(0)
+        
+    def show_frame(self):
+        if self.frame.isHidden():
+            self.frame.show()
+            self.frame.setWindowState(QtCore.Qt.WindowActive)
+        self.frame.raise_()
+    
+    def onTrayClick(self, event):
+        if event in (QtGui.QSystemTrayIcon.DoubleClick,):
+            self.show_frame()
+        
+        elif event is QtGui.QSystemTrayIcon.Trigger:
+            self.tray_menu.show()
+                
 class mainWindow(QtGui.QWidget):
     def __init__(self, parent=None):
         super(mainWindow, self).__init__(parent)
         self.br_client = BroadcastClient()
         self.br_server = BroadcastServer()
         self.link_server = Server()
+
         self.check_thread = CheckBroadcast(self.br_server)
-        
         self.connect(self.check_thread, QtCore.SIGNAL('newClient'), self.check_new_server)
         
         self.remote_server = RemoteServerList()
-        
         self.loading_flag = True
         
-        self.init()
-        
-    def init(self):
         self.setFixedSize(300, 400)
         self.setWindowTitle('linkEach')
         self.setWindowIcon(QtGui.QIcon('icon/medium.ico'))
-        self.setStyleSheet("background-color:#D8D3B5")
         self.set_center()
         
+        
         self.loading_label = loadingLabel(self)
-        self.show_loading()
+        self.loading_label.show()
         
         self.tray_icon = TrayIcon(self)
         self.tray_icon.show()
         
         self.run()
     
-    def show_loading(self):
-        self.loading_label.show()
-        self.loading_label.raise_()
-        
-    def hide_loading(self):
-        if not self.loading_label.isHidden():
-            self.loading_label.hide()
-            self.loading_label.lower()
-    
-        
     def check_new_server(self, remote_servers):
         if remote_servers:
-            self.hide_loading()
+            self.loading_label.label_hide()
         for ip, info_dict in remote_servers.items():
             for server in self.remote_server:
                 if ip in server:
@@ -122,9 +247,6 @@ class mainWindow(QtGui.QWidget):
             for ip in item:
                 if not remote_servers.get(ip):
                     self.remove_cast_label(ip)
-        
-        if not self.remote_server:
-            self.show_loading()
         
     def remove_cast_label(self, ip):
         self.group_ani = QtCore.QParallelAnimationGroup()
@@ -161,7 +283,9 @@ class mainWindow(QtGui.QWidget):
     def add_cast_label(self, remote_ip, info_dict):
         info_dict = info_dict.copy()
         label = castLabel(remote_ip, self)
-        self.connect(label, QtCore.SIGNAL('connect'), self.connect_remote_server)
+        label.setStyleSheet("background-color:rgb(180,180,180)")
+        
+        self.connect(label, QtCore.SIGNAL('cast_connect'), self.connect_remote_server)
         label.show()
         
         self.ani = QtCore.QPropertyAnimation(label, 'geometry')
@@ -181,36 +305,55 @@ class mainWindow(QtGui.QWidget):
         info_dict['label'] = label
         self.remote_server.add({remote_ip:info_dict})
         
-    #TODO: connect will frozen the UI
     def connect_remote_server(self, remote_ip):
-        try:
-            if not self.remote_server[remote_ip].get('client'): 
-                client = Client()
-                client.connect(remote_ip)
-                self.remote_server[remote_ip]['client'] = client
-                
-                operation_label = operationLabel(self)
-                
-                shutdown_func = lambda: self.remote_server[remote_ip]['client'].send_msg(consts.SHUTDOWN_MSG)
-                reboot_func = lambda: self.remote_server[remote_ip]['client'].send_msg(consts.REBOOT_MSG)
-                self.connect(operation_label.shutdown_label, QtCore.SIGNAL('clicked()'), shutdown_func)
-                self.connect(operation_label.reboot_label, QtCore.SIGNAL('clicked()'), reboot_func)
-                
-                self.remote_server[remote_ip]['show_flag'] = False
-                self.remote_server[remote_ip]['operation_label'] = operation_label
-            else:
-                operation_label = self.remote_server[remote_ip]['operation_label']
-                
-            if not self.remote_server[remote_ip].get('show_flag'):
-                self.show_operation_label(remote_ip, operation_label)
-                self.remote_server[remote_ip]['show_flag'] = True
-            else:
-                self.hide_operation_label(remote_ip, operation_label)
-                self.remote_server[remote_ip]['show_flag'] = False
+        if not self.remote_server[remote_ip].get('client'): 
+            client = Client()
+            self.client_thd = clientThd(client, remote_ip)
+            self.client_thd.start()
             
-        except Exception, ex:
-            print ex
+            self.connect(self.client_thd, QtCore.SIGNAL('connected'), self.check_conn)
     
+    def check_conn(self, client, remote_ip=None):
+        if isinstance(client, Exception):
+            self.show_message_label('connect failed!')
+        
+        elif isinstance(client, Client):
+            self.show_message_label('connect successfully!')
+        
+        
+        self.remote_server[remote_ip]['client'] = client
+          
+        operation_label = operationLabel(self)
+        operation_label.setStyleSheet("background-color:#C3ECEF;")
+        shutdown_func = lambda: self.remote_server[remote_ip]['client'].send_msg(consts.SHUTDOWN_MSG)
+        reboot_func = lambda: self.remote_server[remote_ip]['client'].send_msg(consts.REBOOT_MSG)
+        self.connect(operation_label.shutdown_label, QtCore.SIGNAL('clicked()'), shutdown_func)
+        self.connect(operation_label.reboot_label, QtCore.SIGNAL('clicked()'), reboot_func)
+          
+        self.remote_server[remote_ip]['show_flag'] = False
+        self.remote_server[remote_ip]['operation_label'] = operation_label
+              
+        if not self.remote_server[remote_ip].get('show_flag'):
+            self.show_operation_label(remote_ip, operation_label)
+            self.remote_server[remote_ip]['show_flag'] = True
+        else:
+            self.hide_operation_label(remote_ip, operation_label)
+            self.remote_server[remote_ip]['show_flag'] = False
+            
+    def show_message_label(self, msg, duration=2000):
+        if not hasattr(self, 'msg_label'):
+            self.msg_label = clickedLabel(msg, self)
+            self.msg_label.setStyleSheet("background-color:#91CCC0;")
+        self.msg_label.show()
+        self.msg_label.setText(msg)
+        self.msg_ani = QtCore.QPropertyAnimation(self.msg_label, 'geometry')
+        self.msg_ani.setDuration(duration)
+        self.msg_ani.setKeyValueAt(0, QtCore.QRect(0, 400, 300, 40))
+        self.msg_ani.setKeyValueAt(0.1, QtCore.QRect(0, 360, 300, 40))
+        self.msg_ani.setKeyValueAt(0.9, QtCore.QRect(0, 360, 300, 40))
+        self.msg_ani.setKeyValueAt(1, QtCore.QRect(0, 400, 300, 40))
+        self.msg_ani.start()
+        
     def hide_operation_label(self, remote_ip, operation_label):
         self.group_ani = QtCore.QParallelAnimationGroup()
         
@@ -289,102 +432,6 @@ class mainWindow(QtGui.QWidget):
         self.br_client.stop_broadcast()
         self.br_server.stop()
         self.link_server.stop()
-
-class clickedLabel(QtGui.QLabel):
-    def __init__(self, name, parent, default_style_sheet=None):
-        super(clickedLabel, self).__init__(name, parent)
-        if default_style_sheet is None:
-            default_style_sheet = "background-color:rgb(100, 100, 100);"
-            
-        self.default_style_sheet = default_style_sheet
-        self.setStyleSheet(self.default_style_sheet)
-        self.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        
-    def enterEvent(self, event):
-        self.setStyleSheet("background-color:rgb(120, 120, 120);")
-    
-    def leaveEvent(self, event):
-        self.setStyleSheet(self.default_style_sheet)
-    
-    def mousePressEvent(self, event):
-        self.setStyleSheet("background-color:rgb(200, 200, 200);")
-        self.emit(QtCore.SIGNAL('clicked()'))
-        
-    def mouseReleaseEvent(self, event):
-        self.setStyleSheet(self.default_style_sheet)
-
-class castLabel(clickedLabel):
-    def __init__(self, name, parent, style_sheet=None):
-        super(castLabel, self).__init__(name, parent)
-        
-        self.remote_ip = name
-        if not style_sheet:
-            style_sheet = "background-color:rgb(180, 180, 180);"
-        self.default_style_sheet = style_sheet
-        self.setStyleSheet(self.default_style_sheet)
-        self.setFrameShape(QtGui.QFrame.StyledPanel)
-        self.setStyleSheet("border:1px solid gray;")
-    
-    def mousePressEvent(self, event):
-        self.setStyleSheet("background-color:rgb(200, 200, 200);")
-        self.emit(QtCore.SIGNAL('connect'), self.remote_ip)
-
-
-class operationLabel(QtGui.QLabel):
-    def __init__(self, parent=None):
-        super(operationLabel, self).__init__(parent)
-        
-        self.setStyleSheet("background-color:rgb(100, 100, 100);")
-        self.setStyleSheet("border:1px solid gray;")
-        
-        h_layout = QtGui.QHBoxLayout()
-        default_style_sheet = "background-color:rgb(170, 170, 170);"
-        self.shutdown_label = clickedLabel('Shutdown', self, default_style_sheet)
-        self.shutdown_label.setStyleSheet("border-radius:2px;border:1px solid gray")
-        self.reboot_label = clickedLabel('Reboot', self, default_style_sheet)
-        self.reboot_label.setStyleSheet("border-radius:2px;border:1px solid gray")
-        
-        h_layout.addWidget(self.shutdown_label)
-        h_layout.addWidget(self.reboot_label)
-        self.setLayout(h_layout)
-        
-class TrayIcon(QtGui.QSystemTrayIcon):
-    def __init__(self, frame):
-        super(TrayIcon, self).__init__()
-        
-        self.setIcon(QtGui.QIcon('icon/medium.ico'))
-        self.frame = frame
-        
-        self.tray_menu = QtGui.QMenu()
-        exit_action = QtGui.QAction('Exit', self)
-        show_action = QtGui.QAction('Show', self)
-        self.tray_menu.addAction(show_action)
-        self.tray_menu.addAction(exit_action)
-        
-        self.setContextMenu(self.tray_menu)
-        self.activated.connect(self.onTrayClick)
-        
-        self.connect(exit_action, QtCore.SIGNAL('triggered()'), self.exit)
-        self.connect(show_action, QtCore.SIGNAL('triggered()'), self.show_frame)
-        
-    def exit(self):
-        self.frame.stop()
-        sys.exit(0)
-        
-    def show_frame(self):
-        if self.frame.isHidden():
-            self.frame.show()
-            self.frame.setWindowState(QtCore.Qt.WindowActive)
-        self.frame.raise_()
-    
-    def onTrayClick(self, event):
-        if event in (QtGui.QSystemTrayIcon.DoubleClick,):
-            self.show_frame()
-        
-        elif event is QtGui.QSystemTrayIcon.Trigger:
-            self.tray_menu.show()
-                
-    
 
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
