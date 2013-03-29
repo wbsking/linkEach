@@ -4,14 +4,10 @@ import threading
 
 from services import PlatformServices
 
-import logging
-logging.basicConfig(level='DEBUG')
-
 import consts
 
 class BroadcastClient(object):
     def __init__(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.socket = None
         self.stop_flag = False
         
@@ -41,7 +37,6 @@ class BroadcastClient(object):
             
 class BroadcastServer(object):
     def __init__(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
         self._broadcast_clients = {}
         self.socket = None
         self.stop_flag = False
@@ -90,7 +85,6 @@ class BroadcastServer(object):
 
 class Server(object):
     def __init__(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.stop_flag = False
         
         self.services = PlatformServices()
