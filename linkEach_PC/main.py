@@ -79,7 +79,7 @@ class sendMsgThd(QtCore.QThread):
     def run(self):
         try:
             self.sock.send_msg(self.msg)
-            reply = self.sock.read_msg()
+            reply = self.sock.recv_msg()
             if reply[:2] == consts.REPLY_OKMSG:
                 self.emit(QtCore.SIGNAL('reply_msg'), 'Send Message Successfully!')
         except Exception, ex:
@@ -149,9 +149,9 @@ class operationLabel(QtGui.QLabel):
         default_style_sheet = "background-color:rgb(170, 170, 170);"\
                               "border-radius:5px;border:1px solid gray"
                               
-        self.shutdown_label = radiusLabel('Shutdown', default_style_sheet, self)
+        self.shutdown_label = radiusLabel('Shutdown', consts.SHUTDOWN_MSG, default_style_sheet, self)
         self.shutdown_label.setStyleSheet(default_style_sheet)
-        self.reboot_label = radiusLabel('Reboot', default_style_sheet, self)
+        self.reboot_label = radiusLabel('Reboot',  consts.REBOOT_MSG, default_style_sheet, self)
         self.reboot_label.setStyleSheet(default_style_sheet)
         
         h_layout.addWidget(self.shutdown_label)
@@ -159,14 +159,15 @@ class operationLabel(QtGui.QLabel):
         self.setLayout(h_layout)
 
 class radiusLabel(QtGui.QLabel):
-    def __init__(self, name, style_sheet=None, parent=None):
+    def __init__(self, name, msg,  style_sheet=None, parent=None):
         super(radiusLabel, self).__init__(parent)
     
+        self.msg = msg
+        
         if style_sheet is None:
             style_sheet = " background-color:rgb(170, 170, 170);"\
                           "border-radius:5px;border:1px solid gray"
-        self.name = name
-        self.setText(self.name)
+        self.setText(name)
         self.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
         self.default_style_sheet = style_sheet
     
@@ -180,7 +181,8 @@ class radiusLabel(QtGui.QLabel):
     def mousePressEvent(self, event):
         self.setStyleSheet("background-color:rgb(200, 200, 200);"
                            "border-radius:5px;border:1px solid gray")
-        self.emit(QtCore.SIGNAL('send_msg'), self.name)
+        self.emit(QtCore.SIGNAL('send_msg'), self.msg)
+        
         
     def mouseReleaseEvent(self, event):
         self.setStyleSheet(self.default_style_sheet)
@@ -232,7 +234,6 @@ class mainWindow(QtGui.QWidget):
         self.connect(self.check_thread, QtCore.SIGNAL('newClient'), self.check_new_server)
         
         self.remote_server = RemoteServerList()
-        self.loading_flag = True
         
         self.setFixedSize(300, 400)
         self.setWindowTitle('linkEach')
@@ -262,6 +263,8 @@ class mainWindow(QtGui.QWidget):
             for ip in item:
                 if not remote_servers.get(ip):
                     self.remove_cast_label(ip)
+        if not self.remote_server and self.loading_label.isHidden():
+            self.loading_label.label_show()
         
     def remove_cast_label(self, ip):
         self.group_ani = QtCore.QParallelAnimationGroup()
@@ -358,11 +361,13 @@ class mainWindow(QtGui.QWidget):
             self.remote_server[remote_ip]['show_flag'] = True
 
     def send_msg(self, msg, sock):
-        send_thd = sendMsgThd(sock, msg)
-        send_thd.run()
-        self.connect(send_thd, QtCore.SIGNAL('reply_msg'), self.show_message_label)
+        self.send_thd = sendMsgThd(sock, msg)
+        self.send_thd.start()
+        self.loading_label.label_show()
+        self.connect(self.send_thd, QtCore.SIGNAL('reply_msg'), self.show_message_label)
     
     def show_message_label(self, msg, duration=2000):
+        self.loading_label.hide()
         if not hasattr(self, 'msg_label'):
             self.msg_label = clickedLabel(msg, self)
             self.msg_label.setStyleSheet("background-color:#91CCC0;")

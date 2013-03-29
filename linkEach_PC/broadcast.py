@@ -150,9 +150,9 @@ class Server(object):
 class Client(object):
     def __init__(self):
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    
-    def connect(self, server_ip):
-        self.conn.connect((server_ip, consts.SERVER_PORT))
+        
+    def connect(self, server_ip, server_port=consts.SERVER_PORT):
+        self.conn.connect((server_ip, server_port))
     
     def close(self):
         self.conn.close()
