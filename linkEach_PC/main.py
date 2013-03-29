@@ -70,6 +70,21 @@ class clientThd(QtCore.QThread):
         except Exception, ex:
             self.emit(QtCore.SIGNAL('connected'), ex)
 
+class sendMsgThd(QtCore.QThread):
+    def __init__(self, sock, msg, parent=None):
+        super(sendMsgThd, self).__init__(parent)
+        self.msg = msg
+        self.sock = sock
+        
+    def run(self):
+        try:
+            self.sock.send_msg(self.msg)
+            reply = self.sock.read_msg()
+            if reply[:2] == consts.REPLY_OKMSG:
+                self.emit(QtCore.SIGNAL('reply_msg'), 'Send Message Successfully!')
+        except Exception, ex:
+            self.emit(QtCore.SIGNAL('reply_msg'), 'Send Message failed!')
+
 class loadingLabel(QtGui.QLabel):
     def __init__(self, parent=None):
         super(loadingLabel, self).__init__(parent)
@@ -134,9 +149,9 @@ class operationLabel(QtGui.QLabel):
         default_style_sheet = "background-color:rgb(170, 170, 170);"\
                               "border-radius:5px;border:1px solid gray"
                               
-        self.shutdown_label = radiusLabel('Shutdown', self, default_style_sheet)
+        self.shutdown_label = radiusLabel('Shutdown', default_style_sheet, self)
         self.shutdown_label.setStyleSheet(default_style_sheet)
-        self.reboot_label = radiusLabel('Reboot', self, default_style_sheet)
+        self.reboot_label = radiusLabel('Reboot', default_style_sheet, self)
         self.reboot_label.setStyleSheet(default_style_sheet)
         
         h_layout.addWidget(self.shutdown_label)
@@ -312,6 +327,15 @@ class mainWindow(QtGui.QWidget):
             self.client_thd.start()
             
             self.connect(self.client_thd, QtCore.SIGNAL('connected'), self.check_conn)
+            
+        else:
+            operation_label = self.remote_server[remote_ip]['operation_label']
+            if self.remote_server[remote_ip]['show_flag']:
+                self.hide_operation_label(remote_ip, operation_label)
+                self.remote_server[remote_ip]['show_flag'] = False
+            else:
+                self.show_operation_label(remote_ip, operation_label)
+                self.remote_server[remote_ip]['show_flag'] = True
     
     def check_conn(self, client, remote_ip=None):
         if isinstance(client, Exception):
@@ -319,27 +343,25 @@ class mainWindow(QtGui.QWidget):
         
         elif isinstance(client, Client):
             self.show_message_label('connect successfully!')
+            self.remote_server[remote_ip]['client'] = client
         
-        
-        self.remote_server[remote_ip]['client'] = client
-          
-        operation_label = operationLabel(self)
-        operation_label.setStyleSheet("background-color:#C3ECEF;")
-        shutdown_func = lambda: self.remote_server[remote_ip]['client'].send_msg(consts.SHUTDOWN_MSG)
-        reboot_func = lambda: self.remote_server[remote_ip]['client'].send_msg(consts.REBOOT_MSG)
-        self.connect(operation_label.shutdown_label, QtCore.SIGNAL('clicked()'), shutdown_func)
-        self.connect(operation_label.reboot_label, QtCore.SIGNAL('clicked()'), reboot_func)
-          
-        self.remote_server[remote_ip]['show_flag'] = False
-        self.remote_server[remote_ip]['operation_label'] = operation_label
+            operation_label = operationLabel(self)
+            operation_label.setStyleSheet("background-color:#C3ECEF;")
+            self.connect(operation_label.shutdown_label, QtCore.SIGNAL('send_msg'),
+                         lambda msg, x=self.remote_server[remote_ip]['client']: self.send_msg(msg, x))
+            self.connect(operation_label.reboot_label, QtCore.SIGNAL('send_msg'),
+                         lambda msg, x=self.remote_server[remote_ip]['client']: self.send_msg(msg, x))
               
-        if not self.remote_server[remote_ip].get('show_flag'):
+            self.remote_server[remote_ip]['operation_label'] = operation_label
+                  
             self.show_operation_label(remote_ip, operation_label)
             self.remote_server[remote_ip]['show_flag'] = True
-        else:
-            self.hide_operation_label(remote_ip, operation_label)
-            self.remote_server[remote_ip]['show_flag'] = False
-            
+
+    def send_msg(self, msg, sock):
+        send_thd = sendMsgThd(sock, msg)
+        send_thd.run()
+        self.connect(send_thd, QtCore.SIGNAL('reply_msg'), self.show_message_label)
+    
     def show_message_label(self, msg, duration=2000):
         if not hasattr(self, 'msg_label'):
             self.msg_label = clickedLabel(msg, self)
@@ -348,10 +370,10 @@ class mainWindow(QtGui.QWidget):
         self.msg_label.setText(msg)
         self.msg_ani = QtCore.QPropertyAnimation(self.msg_label, 'geometry')
         self.msg_ani.setDuration(duration)
-        self.msg_ani.setKeyValueAt(0, QtCore.QRect(0, 400, 300, 40))
-        self.msg_ani.setKeyValueAt(0.1, QtCore.QRect(0, 360, 300, 40))
-        self.msg_ani.setKeyValueAt(0.9, QtCore.QRect(0, 360, 300, 40))
-        self.msg_ani.setKeyValueAt(1, QtCore.QRect(0, 400, 300, 40))
+        self.msg_ani.setKeyValueAt(0, QtCore.QRect(0, 400, 300, 35))
+        self.msg_ani.setKeyValueAt(0.1, QtCore.QRect(0, 365, 300, 35))
+        self.msg_ani.setKeyValueAt(0.9, QtCore.QRect(0, 365, 300, 35))
+        self.msg_ani.setKeyValueAt(1, QtCore.QRect(0, 400, 300, 35))
         self.msg_ani.start()
         
     def hide_operation_label(self, remote_ip, operation_label):
