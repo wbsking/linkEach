@@ -8,8 +8,11 @@ import android.os.Handler;
 import android.os.Message;
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Color;
 import android.view.Menu;
 import android.view.View;
+import android.widget.RelativeLayout;
+import android.widget.RelativeLayout.LayoutParams;
 import android.widget.TextView;
 import android.widget.ProgressBar;
 
@@ -19,20 +22,22 @@ public class MainActivity extends Activity {
 	public ProgressBar loading_bar;
 	public chkHandler chk_handler;
 	public checkThd chk_thd;
+	public TextView cast_label;
+	public RelativeLayout main_layout;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		
 		cast_label_list = new ArrayList<Map>();
-		chk_handler = new chkHandler();
+		cast_label = new TextView(this);
 		
 		setContentView(R.layout.activity_main);
+		chk_handler = new chkHandler();
 		loading_bar = (ProgressBar)findViewById(R.id.loading_bar);
 		this.show_loading();
 		chk_thd = new checkThd();
 		chk_thd.start();
-
 	}
 
 	public void show_loading(){
@@ -47,6 +52,17 @@ public class MainActivity extends Activity {
 		String client_ip = entry.getKey();
 		Map<String, String> tmp_map = entry.getValue();
 		
+		cast_label.setBackgroundColor(Color.rgb(120, 120, 120));
+		cast_label.setText(client_ip);
+		cast_label.setHeight(50);
+		
+		cast_label.setVisibility(View.VISIBLE);
+		
+		Map tmp = new HashMap<String, TextView>();
+		tmp.put("label", cast_label);
+		cast_label_list.add(tmp);
+		main_layout = (RelativeLayout)findViewById(R.id.main_layout);
+		main_layout.addView(cast_label);
 	}
 	
 	@Override
@@ -56,15 +72,6 @@ public class MainActivity extends Activity {
 		return true;
 	}
 
-	
-	class castLabel extends TextView{
-
-		public castLabel(Context context) {
-			super(context);
-		}
-	}
-	
-	
 	class checkThd extends Thread{
 		private BroadcastServer br_server;
 		public Map clients;

@@ -47,12 +47,6 @@ class getClientsThd extends Thread{
 					tmp_map.put("count", -1);
 				}
 			}
-			catch(SocketTimeoutException e){
-				System.out.println(e);
-			}
-			catch(IOException e){
-				System.out.println(e);
-			}
 			catch(Exception e){
 				System.out.println(e);
 			}
