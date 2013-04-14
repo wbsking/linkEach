@@ -1,5 +1,6 @@
 package com.example.linkeach;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
 
@@ -13,16 +14,19 @@ import android.view.Gravity;
 import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Button;
 import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
+import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.RelativeLayout.LayoutParams;
 import android.widget.TextView;
 import android.widget.ProgressBar;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
+import android.view.animation.TranslateAnimation;
 
-public class MainActivity extends Activity implements OnTouchListener{
+public class MainActivity extends Activity{
 	public List cast_label_list;
 	public Map cast_map;
 	public ProgressBar loading_bar;
@@ -36,7 +40,6 @@ public class MainActivity extends Activity implements OnTouchListener{
 		super.onCreate(savedInstanceState);
 		
 		cast_label_list = new ArrayList<Map>();
-		cast_label = new TextView(this);
 		
 		setContentView(R.layout.activity_main);
 		chk_handler = new chkHandler();
@@ -58,6 +61,7 @@ public class MainActivity extends Activity implements OnTouchListener{
 		String client_ip = entry.getKey();
 		Map<String, String> tmp_map = entry.getValue();
 		String name = tmp_map.get("name");
+		cast_label = new TextView(this);
 		cast_label.setBackgroundColor(Color.rgb(0, 178, 238));
 		cast_label.setText(client_ip);
 		cast_label.setHeight(100);
@@ -65,34 +69,96 @@ public class MainActivity extends Activity implements OnTouchListener{
 		cast_label.setGravity(Gravity.CENTER);
 		cast_label.setVisibility(View.VISIBLE);
 		cast_label.setClickable(true);
-		Animation ani = AnimationUtils.loadAnimation(this, R.anim.trans);
 		
-		cast_label.setAnimation(ani);
 		
-		Map tmp = new HashMap<String, Object>();
+		TranslateAnimation tn = new TranslateAnimation(-300, 0, 0, 0);
+		tn.setDuration(500);
+		cast_label.setAnimation(tn);
+		
+		int label_id = cast_label.getId();
+		Map tmp = new HashMap<Object, Object>();
 		tmp.put("label", cast_label);
 		tmp.put("name", name);
-		Map label_tmp = new HashMap<String, Map>();
-		label_tmp.put(client_ip, tmp);
-		cast_label_list.add(label_tmp);
+		tmp.put("show", false);
+		tmp.put("ip", client_ip);
+		tmp.put("label_id", label_id);
+		cast_label_list.add(tmp);
 		
-		cast_label.setOnTouchListener(this);
+		cast_label.setOnTouchListener(new View.OnTouchListener() {
+			
+			@Override
+			public boolean onTouch(View v, MotionEvent event) {
+				MainActivity.this.cast_label_click(v, event);
+				return false;
+			}
+		});
 		
 		main_layout = (RelativeLayout)findViewById(R.id.main_layout);
 		main_layout.addView(cast_label, new LayoutParams(LayoutParams.MATCH_PARENT, 
 				LayoutParams.WRAP_CONTENT));
 	}
 	
-	public boolean onTouch(View v, MotionEvent event){
+	public void cast_label_click(View v, MotionEvent event){
 		if(MotionEvent.ACTION_DOWN == event.getAction()){
 			v.setBackgroundColor(Color.rgb(0, 153, 204));
 		}
 		else if(MotionEvent.ACTION_UP == event.getAction()){
-			cast_label.setBackgroundColor(Color.rgb(0, 178, 238));
+			v.setBackgroundColor(Color.rgb(0, 178, 238));
 		}
-		return false;
+		for(int i=0; i<cast_label_list.size();i++){
+			Map tmp = (Map)cast_label_list.get(i);
+			if((Integer)tmp.get("label_id") == v.getId()){
+				if(!tmp.containsKey("client")){
+					try{
+						connThd conn = new connThd((String)tmp.get("ip"));
+						conn.start();
+						tmp.put("client", conn);
+						LinearLayout ctrl_layout = new LinearLayout(this);
+						LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 100);
+						ctrl_layout.setGravity(Gravity.CENTER);
+						ctrl_layout.setOrientation(0);
+						ctrl_layout.setLayoutParams(lp);
+						ctrl_layout.setBackgroundColor(Color.rgb(0, 153, 204));
+						Button power_btn = new Button(this);
+						Button reboot_btn = new Button(this);
+						power_btn.setWidth(180);
+						power_btn.setHeight(80);
+						power_btn.setText("ShutDown");
+						
+						reboot_btn.setWidth(180);
+						reboot_btn.setHeight(80);
+						reboot_btn.setText("Reboot");
+						
+						ctrl_layout.addView(power_btn);
+						ctrl_layout.addView(reboot_btn);
+						
+						TranslateAnimation tn = new TranslateAnimation(-300, 0, 0, 0);
+						tn.setDuration(300);
+						ctrl_layout.setAnimation(tn);
+						main_layout = (RelativeLayout)findViewById(R.id.main_layout);
+						RelativeLayout.LayoutParams rp = new LayoutParams(LayoutParams.MATCH_PARENT, 
+								LayoutParams.WRAP_CONTENT);
+						rp.topMargin = v.getTop() + 100;
+						tmp.put("ctrl_label", ctrl_layout);
+						tmp.put("show", true);
+						main_layout.addView(ctrl_layout, rp);
+						
+					}
+					catch(Exception ex){
+						ex.printStackTrace();
+					}
+				
+				}else{
+					connThd client = (connThd)tmp.get("client");
+				}
+			}
 		}
+		
+	}
 	
+	public void add_control_label(){
+		
+	}
 	
 	
 	@Override
@@ -149,7 +215,7 @@ public class MainActivity extends Activity implements OnTouchListener{
 					int cast_len = MainActivity.this.cast_label_list.size();
 					for(i=0; i<cast_len; i++){
 						Map element = (Map)MainActivity.this.cast_label_list.get(i);
-						if(element.containsKey(client_ip)){
+						if(element.get("ip") == client_ip){
 							break;
 						}
 					}
@@ -161,4 +227,34 @@ public class MainActivity extends Activity implements OnTouchListener{
 		}
 		
 	}
+	
+	class connThd extends Thread{
+		Client cli = new Client();
+		String remote_ip;
+		String msg;
+		
+		public connThd(String ip){
+			remote_ip = ip;
+		}
+		
+		public void send_msg(String msg){
+			this.msg = msg;
+		}
+		
+		public void run(){
+			try{
+				cli.connect(remote_ip);
+				while(true){
+					if(msg != null){
+						cli.send_msg(msg);
+						msg = null;
+					}
+				}
+			}
+			catch(Exception ex){
+				ex.printStackTrace();
+			}
+		}
+	}
+	
 }
