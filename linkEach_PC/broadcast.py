@@ -2,6 +2,9 @@ import socket
 import time
 import threading
 
+import logging
+logging.basicConfig(level="DEBUG")
+
 from services import PlatformServices
 
 import consts
@@ -10,6 +13,7 @@ class BroadcastClient(object):
     def __init__(self):
         self.socket = None
         self.stop_flag = False
+        self.logger = logging.getLogger(self.__class__.__name__)
         
     def run(self):
         br_thd = threading.Thread(target=self.broadcast)
@@ -30,7 +34,7 @@ class BroadcastClient(object):
                                (consts.BROADCAST_IP, consts.BROADCAST_PORT))
                 time.sleep(5)
         except Exception, ex:
-            self.logger.error('%s' % ex)
+            self.logger('%s' % ex)
         finally:
             self.socket.close()
             self.socket = None
@@ -40,6 +44,7 @@ class BroadcastServer(object):
         self._broadcast_clients = {}
         self.socket = None
         self.stop_flag = False
+        self.logger = logging.getLogger(self.__class__.__name__)
         
     def run(self):
         br_thd = threading.Thread(target=self._get_broadcast_client)

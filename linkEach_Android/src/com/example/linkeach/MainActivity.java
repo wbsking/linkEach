@@ -7,6 +7,8 @@ import java.util.Map.Entry;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
@@ -22,8 +24,6 @@ import android.widget.RelativeLayout;
 import android.widget.RelativeLayout.LayoutParams;
 import android.widget.TextView;
 import android.widget.ProgressBar;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
 import android.view.animation.TranslateAnimation;
 
 public class MainActivity extends Activity{
@@ -31,6 +31,7 @@ public class MainActivity extends Activity{
 	public Map cast_map;
 	public ProgressBar loading_bar;
 	public chkHandler chk_handler;
+	public connHandler conn_handler;
 	public checkThd chk_thd;
 	public TextView cast_label;
 	public RelativeLayout main_layout;
@@ -43,6 +44,7 @@ public class MainActivity extends Activity{
 		
 		setContentView(R.layout.activity_main);
 		chk_handler = new chkHandler();
+		
 		loading_bar = (ProgressBar)findViewById(R.id.loading_bar);
 		this.show_loading();
 		chk_thd = new checkThd();
@@ -64,16 +66,10 @@ public class MainActivity extends Activity{
 		cast_label = new TextView(this);
 		cast_label.setBackgroundColor(Color.rgb(0, 178, 238));
 		cast_label.setText(client_ip);
-		cast_label.setHeight(100);
 		cast_label.setTextSize(20);
 		cast_label.setGravity(Gravity.CENTER);
 		cast_label.setVisibility(View.VISIBLE);
 		cast_label.setClickable(true);
-		
-		
-		TranslateAnimation tn = new TranslateAnimation(-300, 0, 0, 0);
-		tn.setDuration(500);
-		cast_label.setAnimation(tn);
 		
 		int label_id = cast_label.getId();
 		Map tmp = new HashMap<Object, Object>();
@@ -82,7 +78,6 @@ public class MainActivity extends Activity{
 		tmp.put("show", false);
 		tmp.put("ip", client_ip);
 		tmp.put("label_id", label_id);
-		cast_label_list.add(tmp);
 		
 		cast_label.setOnTouchListener(new View.OnTouchListener() {
 			
@@ -93,9 +88,23 @@ public class MainActivity extends Activity{
 			}
 		});
 		
+		int margin_top = 0;
+		for(Iterator it=cast_label_list.iterator();it.hasNext();){
+			Map cast_map = (Map)it.next();
+			margin_top += 100;
+			if((Boolean) cast_map.get("show")){
+				margin_top += 80;
+			}
+		}
 		main_layout = (RelativeLayout)findViewById(R.id.main_layout);
-		main_layout.addView(cast_label, new LayoutParams(LayoutParams.MATCH_PARENT, 
-				LayoutParams.WRAP_CONTENT));
+		LayoutParams rp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+		rp.topMargin = margin_top;
+		
+		ValueAnimator tn = ObjectAnimator.ofInt(cast_label, "height", 0, 100);;
+		tn.setDuration(500);
+		tn.start();
+		main_layout.addView(cast_label, rp);
+		cast_label_list.add(tmp);
 	}
 	
 	public void cast_label_click(View v, MotionEvent event){
@@ -104,60 +113,71 @@ public class MainActivity extends Activity{
 		}
 		else if(MotionEvent.ACTION_UP == event.getAction()){
 			v.setBackgroundColor(Color.rgb(0, 178, 238));
-		}
-		for(int i=0; i<cast_label_list.size();i++){
-			Map tmp = (Map)cast_label_list.get(i);
-			if((Integer)tmp.get("label_id") == v.getId()){
-				if(!tmp.containsKey("client")){
-					try{
-						connThd conn = new connThd((String)tmp.get("ip"));
-						conn.start();
-						tmp.put("client", conn);
-						LinearLayout ctrl_layout = new LinearLayout(this);
-						LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 100);
-						ctrl_layout.setGravity(Gravity.CENTER);
-						ctrl_layout.setOrientation(0);
-						ctrl_layout.setLayoutParams(lp);
-						ctrl_layout.setBackgroundColor(Color.rgb(0, 153, 204));
-						Button power_btn = new Button(this);
-						Button reboot_btn = new Button(this);
-						power_btn.setWidth(180);
-						power_btn.setHeight(80);
-						power_btn.setText("ShutDown");
-						
-						reboot_btn.setWidth(180);
-						reboot_btn.setHeight(80);
-						reboot_btn.setText("Reboot");
-						
-						ctrl_layout.addView(power_btn);
-						ctrl_layout.addView(reboot_btn);
-						
-						TranslateAnimation tn = new TranslateAnimation(-300, 0, 0, 0);
-						tn.setDuration(300);
-						ctrl_layout.setAnimation(tn);
-						main_layout = (RelativeLayout)findViewById(R.id.main_layout);
-						RelativeLayout.LayoutParams rp = new LayoutParams(LayoutParams.MATCH_PARENT, 
-								LayoutParams.WRAP_CONTENT);
-						rp.topMargin = v.getTop() + 100;
-						tmp.put("ctrl_label", ctrl_layout);
-						tmp.put("show", true);
-						main_layout.addView(ctrl_layout, rp);
+			for(int i=0; i<cast_label_list.size();i++){
+				Map tmp = (Map)cast_label_list.get(i);
+				if((Integer)tmp.get("label_id") == v.getId()){
+					if(!tmp.containsKey("client")){
+						try{
+							conn_handler = new connHandler((String)tmp.get("ip"));
+							tmp.put("client", conn_handler);
+							LinearLayout ctrl_layout = new LinearLayout(this);
+							LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(180, 80);
+							ctrl_layout.setGravity(Gravity.CENTER);
+							ctrl_layout.setOrientation(0);
+							ctrl_layout.setBackgroundColor(Color.rgb(0, 153, 204));
+							Button power_btn = new Button(this);
+							Button reboot_btn = new Button(this);
+							
+							power_btn.setOnClickListener(new OnClickListener(){
+								public void onClick(View v){
+									Message msg = new Message();
+									Bundle bund = new Bundle();
+									bund.putString("cmd", Consts.SHUTDOWN_MSG);
+									msg.setData(bund);
+									conn_handler.sendMessage(msg);
+								}
+							});
+							
+							reboot_btn.setOnClickListener(new OnClickListener(){
+								public void onClick(View v){
+									Message msg = new Message();
+									Bundle bund = new Bundle();
+									bund.putString("cmd", Consts.REBOOT_MSG);
+									msg.setData(bund);
+									conn_handler.sendMessage(msg);
+								}
+							});
+							
+							power_btn.setText("ShutDown");
+							reboot_btn.setText("Reboot");
+							
+							ctrl_layout.addView(power_btn, lp);
+							ctrl_layout.addView(reboot_btn, lp);
+							
+							main_layout = (RelativeLayout)findViewById(R.id.main_layout);
+							RelativeLayout.LayoutParams rp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+							rp.topMargin = v.getTop() + 100;
+							
+							tmp.put("ctrl_label", ctrl_layout);
+							tmp.put("show", true);
+							main_layout.addView(ctrl_layout, rp);
+							
+						}
+						catch(Exception ex){
+							ex.printStackTrace();
+						}
+					
+					}else if((Boolean)tmp.get("show")){
+						LinearLayout ctrl_label = (LinearLayout)tmp.get("ctrl_label");
+						LayoutParams rp = (LayoutParams) ctrl_label.getLayoutParams();
+						rp.height = 0;
+						ctrl_label.setLayoutParams(rp);
+					}else{
 						
 					}
-					catch(Exception ex){
-						ex.printStackTrace();
-					}
-				
-				}else{
-					connThd client = (connThd)tmp.get("client");
 				}
 			}
 		}
-		
-	}
-	
-	public void add_control_label(){
-		
 	}
 	
 	
@@ -225,36 +245,58 @@ public class MainActivity extends Activity{
 				}
 			}
 		}
-		
 	}
 	
-	class connThd extends Thread{
-		Client cli = new Client();
+	class connHandler extends Handler{
+		Client cli;
 		String remote_ip;
 		String msg;
 		
-		public connThd(String ip){
+		public connHandler(String ip){
 			remote_ip = ip;
+			cli = new Client();
 		}
 		
-		public void send_msg(String msg){
+		public void handleMessage(Message msg){
+			if(msg!=null){
+				try{
+					String cmd = (String) msg.getData().get("cmd");
+					connThd conn = new connThd(cli, remote_ip, cmd);
+					conn.start();
+				}
+				catch(Exception ex){
+					ex.printStackTrace();
+				}
+			}
+		}
+	}
+	
+	class connThd extends Thread{
+		public Client conn;
+		String ip;
+		String msg;
+		
+		public connThd(Client conn, String ip, String msg){
+			this.conn =conn; 
+			this.ip = ip;
 			this.msg = msg;
 		}
 		
 		public void run(){
 			try{
-				cli.connect(remote_ip);
-				while(true){
-					if(msg != null){
-						cli.send_msg(msg);
-						msg = null;
-					}
+				if(!this.conn.is_conn){
+					this.conn.connect(ip);
 				}
-			}
-			catch(Exception ex){
+				this.conn.send_msg(this.msg);
+				
+			}catch(Exception ex){
 				ex.printStackTrace();
 			}
 		}
+		
 	}
-	
 }
+
+
+
+
