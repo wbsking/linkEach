@@ -1,6 +1,5 @@
 package com.example.linkeach;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
 
@@ -19,12 +18,12 @@ import android.view.View;
 import android.widget.Button;
 import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
+import android.view.animation.Animation;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.RelativeLayout.LayoutParams;
 import android.widget.TextView;
 import android.widget.ProgressBar;
-import android.view.animation.TranslateAnimation;
 
 public class MainActivity extends Activity{
 	public List cast_label_list;
@@ -155,8 +154,12 @@ public class MainActivity extends Activity{
 							ctrl_layout.addView(reboot_btn, lp);
 							
 							main_layout = (RelativeLayout)findViewById(R.id.main_layout);
-							RelativeLayout.LayoutParams rp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+							RelativeLayout.LayoutParams rp = new LayoutParams(LayoutParams.MATCH_PARENT, 0);
 							rp.topMargin = v.getTop() + 100;
+							
+							Animation ani = new ShowAnim(ctrl_layout, 100);
+							ani.setDuration(500);
+							ctrl_layout.startAnimation(ani);
 							
 							tmp.put("ctrl_label", ctrl_layout);
 							tmp.put("show", true);
